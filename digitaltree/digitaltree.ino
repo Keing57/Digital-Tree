@@ -7,9 +7,14 @@ Adafruit_SSD1306 display(128, 64, &Wire, -1);
 const int waterButtonPin = 2;
 const int hugButtonPin = 3;
 const int breatheButtonPin = 4;
+const int ldrPin = A0;
 
 int growthStage = 0;
 bool isWithered = false;
+bool hasFruit = false;
+bool isShowingSankalpa = false;
+unsigned long sankalpaStartTime = 0;
+int currentSankalpaIndex = 0;
 
 unsigned long lastWaterDebounce = 0;
 unsigned long lastHugDebounce = 0;
@@ -25,8 +30,16 @@ unsigned long lastTickMillis = 0;
 
 unsigned long lastWateredHour = 0;
 unsigned long lastHuggedHour = 0;
+unsigned long lastHarvestHour = 0;
 int waterCount48h = 0;
 unsigned long waterWindowStartHour = 0;
+
+const char* sankalpak[] = {
+  "Beke van benned.",
+  "Csodalatos vagy!",
+  "Eros vagy.",
+  "Minden rendben."
+};
 
 void setup() {
   Serial.begin(115200);
@@ -49,20 +62,44 @@ void loop() {
       waterCount48h = 0;
       waterWindowStartHour = gameTimeHours;
     }
-    
+
     if (!isWithered) {
-        if (gameTimeHours > 0 && gameTimeHours % 24 == 0) {
-            if ((gameTimeHours - lastHuggedHour <= 24) && (gameTimeHours - lastWateredHour <= 12)) {
-                if (growthStage < 12) growthStage++;
-            }
+      unsigned long lastInteraction = lastWateredHour > lastHuggedHour ? lastWateredHour : lastHuggedHour;
+      if (gameTimeHours > 0 && (gameTimeHours - lastInteraction >= 48)) {
+        isWithered = true;
+      }
+
+      if (gameTimeHours % 24 == 0) {
+        if ((gameTimeHours - lastHuggedHour <= 24) && (gameTimeHours - lastWateredHour <= 12)) {
+          if (growthStage < 12) growthStage++;
         }
+      }
+
+      if (growthStage >= 12 && !hasFruit && (gameTimeHours - lastHarvestHour >= 18)) {
+        hasFruit = true;
+      }
     }
+    
+    if (isShowingSankalpa && millis() - sankalpaStartTime > 5000) {
+      isShowingSankalpa = false;
+    }
+
     drawScene();
   }
 
   int wRead = digitalRead(waterButtonPin);
   int hRead = digitalRead(hugButtonPin);
   int bRead = digitalRead(breatheButtonPin);
+  int ldrValue = analogRead(ldrPin);
+
+  if (hasFruit && ldrValue < 200 && !isShowingSankalpa && !isWithered) {
+    hasFruit = false;
+    lastHarvestHour = gameTimeHours;
+    isShowingSankalpa = true;
+    sankalpaStartTime = millis();
+    currentSankalpaIndex = gameTimeHours % 4;
+    drawScene();
+  }
 
   if (wRead != lastWaterState) lastWaterDebounce = millis();
   if (hRead != lastHugState) lastHugDebounce = millis();
@@ -71,14 +108,14 @@ void loop() {
   if ((millis() - lastWaterDebounce) > debounceDelay) {
     if (wRead == LOW && lastWaterState == HIGH) {
       if (!isWithered) {
-          lastWateredHour = gameTimeHours;
-          waterCount48h++;
-          if (waterCount48h >= 10) {
-            isWithered = true;
-          } else {
-            if (growthStage == 0) growthStage = 1;
-          }
-          drawScene();
+        lastWateredHour = gameTimeHours;
+        waterCount48h++;
+        if (waterCount48h >= 10) {
+          isWithered = true;
+        } else {
+          if (growthStage == 0) growthStage = 1;
+        }
+        drawScene();
       }
     }
   }
@@ -86,9 +123,9 @@ void loop() {
   if ((millis() - lastHugDebounce) > debounceDelay) {
     if (hRead == LOW && lastHugState == HIGH) {
       if (!isWithered) {
-          lastHuggedHour = gameTimeHours;
-          if (growthStage == 1) growthStage = 2;
-          drawScene();
+        lastHuggedHour = gameTimeHours;
+        if (growthStage == 1) growthStage = 2;
+        drawScene();
       }
     }
   }
@@ -99,6 +136,8 @@ void loop() {
         isWithered = false;
         waterCount48h = 0;
         waterWindowStartHour = gameTimeHours;
+        lastWateredHour = gameTimeHours;
+        lastHuggedHour = gameTimeHours;
         drawScene();
       }
     }
@@ -111,6 +150,16 @@ void loop() {
 
 void drawScene() {
   display.clearDisplay();
+  
+  if (isShowingSankalpa) {
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(15, 30);
+    display.print(sankalpak[currentSankalpaIndex]);
+    display.display();
+    return;
+  }
+
   display.drawLine(0, 63, 128, 63, SSD1306_WHITE);
 
   if (isWithered) {
@@ -133,6 +182,16 @@ void drawScene() {
       display.drawLine(64, 62 - (h/2), 68, 62 - (h/2) - 4, SSD1306_WHITE);
       display.drawLine(64, 62 - (h/4), 60, 62 - (h/4) - 4, SSD1306_WHITE);
       display.drawCircle(64, 62 - h - 4, 4 + (growthStage/2), SSD1306_WHITE);
+
+      if (hasFruit) {
+        int fx = 68;
+        int fy = 62 - (h/2) - 3;
+        display.drawPixel(fx-1, fy-1, SSD1306_WHITE);
+        display.drawPixel(fx+1, fy-1, SSD1306_WHITE);
+        display.drawLine(fx-2, fy, fx+2, fy, SSD1306_WHITE);
+        display.drawLine(fx-1, fy+1, fx+1, fy+1, SSD1306_WHITE);
+        display.drawPixel(fx, fy+2, SSD1306_WHITE);
+      }
     }
   }
   
