@@ -46,7 +46,13 @@ const char* sankalpak[] = {
   "Beke van benned.",
   "Csodalatos vagy!",
   "Eros vagy.",
-  "Minden rendben."
+  "Minden rendben.",
+  "Engedd el a multat.",
+  "Mosolyogj!",
+  "Namaste.",
+  "Feny es szeretet.",
+  "Lelki beke.",
+  "Szeretve vagy."
 };
 
 void saveState() {
@@ -98,20 +104,23 @@ void loop() {
       unsigned long lastInteraction = state.lastWateredHour > state.lastHuggedHour ? state.lastWateredHour : state.lastHuggedHour;
       if (state.gameTimeHours > 0 && (state.gameTimeHours - lastInteraction >= 48)) {
         state.isWithered = true;
+        saveState();
       }
 
       if (state.gameTimeHours % 24 == 0) {
         if ((state.gameTimeHours - state.lastHuggedHour <= 24) && (state.gameTimeHours - state.lastWateredHour <= 12)) {
-          if (state.growthStage < 12) state.growthStage++;
+          if (state.growthStage < 12) {
+            state.growthStage++;
+            saveState();
+          }
         }
       }
 
       if (state.growthStage >= 12 && !state.hasFruit && (state.gameTimeHours - state.lastHarvestHour >= 18)) {
         state.hasFruit = true;
+        saveState();
       }
     }
-    
-    saveState();
     
     if (isShowingSankalpa && millis() - sankalpaStartTime > 5000) {
       isShowingSankalpa = false;
@@ -132,7 +141,7 @@ void loop() {
     state.lastHarvestHour = state.gameTimeHours;
     isShowingSankalpa = true;
     sankalpaStartTime = millis();
-    currentSankalpaIndex = state.gameTimeHours % 4;
+    currentSankalpaIndex = state.gameTimeHours % 10;
     saveState();
     drawScene();
   }
@@ -188,7 +197,7 @@ void loop() {
         
         display.clearDisplay();
         display.drawCircle(64, 32, breathRadius, SSD1306_WHITE);
-        display.setCursor(20, 55);
+        display.setCursor(30, 55);
         display.setTextColor(SSD1306_WHITE);
         display.print("Lelegezz...");
         display.display();
@@ -232,6 +241,8 @@ void drawScene() {
 
   if (state.isWithered) {
     display.drawLine(64, 62, 64, 50, SSD1306_WHITE);
+    display.drawLine(63, 62, 63, 50, SSD1306_WHITE);
+    display.drawLine(65, 62, 65, 50, SSD1306_WHITE);
     display.drawLine(64, 55, 66, 59, SSD1306_WHITE);
     display.drawLine(64, 58, 62, 60, SSD1306_WHITE);
   } else {
@@ -247,13 +258,17 @@ void drawScene() {
     } else if (state.growthStage >= 2) {
       int h = 12 + (state.growthStage * 2);
       display.drawLine(64, 62, 64, 62 - h, SSD1306_WHITE);
-      display.drawLine(64, 62 - (h/2), 68, 62 - (h/2) - 4, SSD1306_WHITE);
-      display.drawLine(64, 62 - (h/4), 60, 62 - (h/4) - 4, SSD1306_WHITE);
-      display.drawCircle(64, 62 - h - 4, 4 + (state.growthStage/2), SSD1306_WHITE);
+      display.drawLine(63, 62, 63, 62 - h, SSD1306_WHITE);
+      display.drawLine(65, 62, 65, 62 - h, SSD1306_WHITE);
+      display.drawLine(64, 62 - (h/2), 72, 62 - (h/2) - 8, SSD1306_WHITE);
+      display.drawLine(64, 62 - (h/4), 56, 62 - (h/4) - 8, SSD1306_WHITE);
+      display.drawCircle(64, 62 - h - 4, 6 + (state.growthStage/2), SSD1306_WHITE);
+      display.drawCircle(72, 62 - (h/2) - 8, 4 + (state.growthStage/3), SSD1306_WHITE);
+      display.drawCircle(56, 62 - (h/4) - 8, 4 + (state.growthStage/3), SSD1306_WHITE);
 
-      if (state.hasFruit) {
-        int fx = 68;
-        int fy = 62 - (h/2) - 3;
+      if (state.hasFruit && (millis() / 500) % 2 == 0) {
+        int fx = 76;
+        int fy = 62 - (h/2) - 10;
         display.drawPixel(fx-1, fy-1, SSD1306_WHITE);
         display.drawPixel(fx+1, fy-1, SSD1306_WHITE);
         display.drawLine(fx-2, fy, fx+2, fy, SSD1306_WHITE);
@@ -262,13 +277,6 @@ void drawScene() {
       }
     }
   }
-  
-  display.setCursor(0, 0);
-  display.setTextColor(SSD1306_WHITE);
-  display.print("H:");
-  display.print(state.gameTimeHours);
-  display.print(" S:");
-  display.print(state.growthStage);
   
   display.display();
 }
